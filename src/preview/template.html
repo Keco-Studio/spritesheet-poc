@@ -1,0 +1,85 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Sprite Sheet Preview</title>
+  <style>
+    body { background: #1a1a1a; color: #eee; font-family: system-ui, sans-serif; margin: 0; padding: 24px; }
+    h1 { font-size: 18px; margin: 0 0 16px; }
+    #game { image-rendering: pixelated; }
+    .meta { font-size: 12px; opacity: 0.7; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <h1 id="title">Sprite Sheet Preview</h1>
+  <canvas id="game"></canvas>
+  <div class="meta" id="meta"></div>
+  <script type="application/json" id="manifest">__MANIFEST_JSON__</script>
+  <script type="module">
+    import { Engine, ImageSource, SpriteSheet, Animation, Actor, Vector, Color, Label, Font, TextAlign, FontUnit, Loader } from "https://esm.sh/excalibur@0.30.3";
+
+    const manifest = JSON.parse(document.getElementById("manifest").textContent);
+    document.getElementById("title").textContent = "Sprite Sheet Preview — " + Object.keys(manifest.actions).join(", ");
+    document.getElementById("meta").textContent = `frameSize=${manifest.frameSize} grid=${manifest.columns}x${manifest.rows}`;
+
+    const SCALE = 3;
+    const PAD = 16;
+    const cellW = manifest.frameSize * SCALE + PAD * 2;
+    const labelH = 24;
+    const actionNames = Object.keys(manifest.actions);
+    const canvasW = Math.max(cellW * actionNames.length, 320);
+    const canvasH = manifest.frameSize * SCALE + PAD * 2 + labelH;
+
+    const game = new Engine({
+      canvasElementId: "game",
+      width: canvasW,
+      height: canvasH,
+      backgroundColor: Color.fromHex("#2a2a2a"),
+      antialiasing: false,
+      pixelArt: true,
+    });
+
+    const image = new ImageSource("spritesheet.png");
+    const loader = new Loader([image]);
+
+    await game.start(loader);
+
+    const sheet = SpriteSheet.fromImageSource({
+      image,
+      grid: {
+        columns: manifest.columns,
+        rows: manifest.rows,
+        spriteWidth: manifest.frameSize,
+        spriteHeight: manifest.frameSize,
+      },
+    });
+
+    actionNames.forEach((name, i) => {
+      const a = manifest.actions[name];
+      const frames = [];
+      for (let c = 0; c < a.frameCount; c++) {
+        frames.push({ graphic: sheet.getSprite(c, a.row), duration: a.durationMs });
+      }
+      const anim = new Animation({ frames });
+      anim.scale = new Vector(SCALE, SCALE);
+
+      const actor = new Actor({
+        x: PAD + i * cellW + (manifest.frameSize * SCALE) / 2,
+        y: PAD + (manifest.frameSize * SCALE) / 2,
+        width: manifest.frameSize * SCALE,
+        height: manifest.frameSize * SCALE,
+      });
+      actor.graphics.use(anim);
+      game.add(actor);
+
+      const label = new Label({
+        text: name,
+        x: PAD + i * cellW + (manifest.frameSize * SCALE) / 2,
+        y: PAD + manifest.frameSize * SCALE + 18,
+        font: new Font({ family: "system-ui", size: 14, unit: FontUnit.Px, color: Color.White, textAlign: TextAlign.Center }),
+      });
+      game.add(label);
+    });
+  </script>
+</body>
+</html>
