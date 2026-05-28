@@ -2,6 +2,7 @@
   "name": "knight",
   "description": "armored knight with a sword and red cape",
   "size": 64,
+  "directions": 8,
   "actions": [
     { "name": "idle",   "prompt": "standing still, breathing",  "frames": 4 },
     { "name": "walk",   "prompt": "walking forward",            "frames": 8 },
