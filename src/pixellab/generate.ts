@@ -4,10 +4,11 @@ import { waitForJob } from "./poll.js";
 
 type CreateCharacterStartResponse = { background_job_id: string };
 
-type DirectionImages = Record<string, { type: "base64"; base64: string }>;
-
 /**
  * Returns the south-facing 64x64 PNG as a raw base64 string (no data: prefix).
+ *
+ * create-character-v3 persists the character and returns storage URLs rather than
+ * inline base64, so we fetch the south rotation and convert it ourselves.
  */
 export async function generateBaseSprite(
   client: PixelLabClient,
@@ -20,19 +21,26 @@ export async function generateBaseSprite(
   );
 
   const job = await waitForJob(client, start.background_job_id);
-  const images = (job.last_response?.images ?? job.last_response) as DirectionImages | undefined;
-  const south = images?.south?.base64;
-  if (!south) {
+  const last = job.last_response as
+    | { storage_urls?: Record<string, string> }
+    | undefined;
+  const southUrl = last?.storage_urls?.south;
+  if (!southUrl) {
     throw new PixelLabError(
-      `create-character-v3 completed but no south image found`,
+      `create-character-v3 completed but no south storage_url found`,
       undefined,
       JSON.stringify(job.last_response).slice(0, 500),
     );
   }
-  return stripDataUrl(south);
-}
 
-function stripDataUrl(s: string): string {
-  const i = s.indexOf(",");
-  return i >= 0 && s.startsWith("data:") ? s.slice(i + 1) : s;
+  const res = await fetch(southUrl);
+  if (!res.ok) {
+    throw new PixelLabError(
+      `failed to fetch south sprite from ${southUrl}`,
+      res.status,
+      await res.text(),
+    );
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  return buf.toString("base64");
 }
