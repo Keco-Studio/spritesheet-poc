@@ -1,0 +1,9 @@
+{
+  "name": "knight-smoke",
+  "description": "armored knight with a sword and red cape",
+  "size": 64,
+  "directions": 8,
+  "actions": [
+    { "name": "idle", "prompt": "standing still, breathing", "frames": 4 }
+  ]
+}
