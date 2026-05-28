@@ -19,67 +19,163 @@
     import { Engine, ImageSource, SpriteSheet, Animation, Actor, Vector, Color, Label, Font, TextAlign, FontUnit, Loader } from "https://esm.sh/excalibur@0.30.3";
 
     const manifest = JSON.parse(document.getElementById("manifest").textContent);
-    document.getElementById("title").textContent = "Sprite Sheet Preview — " + Object.keys(manifest.actions).join(", ");
     document.getElementById("meta").textContent = `frameSize=${manifest.frameSize} grid=${manifest.columns}x${manifest.rows}`;
 
     const SCALE = 3;
     const PAD = 16;
-    const cellW = manifest.frameSize * SCALE + PAD * 2;
-    const labelH = 24;
+    const CELL = manifest.frameSize * SCALE;
     const actionNames = Object.keys(manifest.actions);
-    const canvasW = Math.max(cellW * actionNames.length, 320);
-    const canvasH = manifest.frameSize * SCALE + PAD * 2 + labelH;
-
-    const game = new Engine({
-      canvasElementId: "game",
-      width: canvasW,
-      height: canvasH,
-      backgroundColor: Color.fromHex("#2a2a2a"),
-      antialiasing: false,
-      pixelArt: true,
-    });
 
     const image = new ImageSource("__IMAGE_SRC__");
     const loader = new Loader([image]);
 
-    await game.start(loader);
+    if (manifest.directions.length === 1) {
+      // --- 1-direction: side-by-side layout (original behavior) ---
+      const cellW = CELL + PAD * 2;
+      const labelH = 24;
+      const canvasW = Math.max(cellW * actionNames.length, 320);
+      const canvasH = CELL + PAD * 2 + labelH;
 
-    const sheet = SpriteSheet.fromImageSource({
-      image,
-      grid: {
-        columns: manifest.columns,
-        rows: manifest.rows,
-        spriteWidth: manifest.frameSize,
-        spriteHeight: manifest.frameSize,
-      },
-    });
+      document.getElementById("title").textContent = "Sprite Sheet Preview — " + actionNames.join(", ");
 
-    actionNames.forEach((name, i) => {
-      const a = manifest.actions[name];
-      const frames = [];
-      for (let c = 0; c < a.frameCount; c++) {
-        frames.push({ graphic: sheet.getSprite(c, a.row), duration: a.durationMs });
+      const game = new Engine({
+        canvasElementId: "game",
+        width: canvasW,
+        height: canvasH,
+        backgroundColor: Color.fromHex("#2a2a2a"),
+        antialiasing: false,
+        pixelArt: true,
+      });
+
+      await game.start(loader);
+
+      const sheet = SpriteSheet.fromImageSource({
+        image,
+        grid: {
+          columns: manifest.columns,
+          rows: manifest.rows,
+          spriteWidth: manifest.frameSize,
+          spriteHeight: manifest.frameSize,
+        },
+      });
+
+      actionNames.forEach((name, i) => {
+        const a = manifest.actions[name];
+        const row = a.rowByDirection["south"];
+        const frames = [];
+        for (let c = 0; c < a.frameCount; c++) {
+          frames.push({ graphic: sheet.getSprite(c, row), duration: a.durationMs });
+        }
+        const anim = new Animation({ frames });
+        anim.scale = new Vector(SCALE, SCALE);
+
+        const actor = new Actor({
+          x: PAD + i * cellW + CELL / 2,
+          y: PAD + CELL / 2,
+          width: CELL,
+          height: CELL,
+        });
+        actor.graphics.use(anim);
+        game.add(actor);
+
+        const label = new Label({
+          text: name,
+          x: PAD + i * cellW + CELL / 2,
+          y: PAD + CELL + 18,
+          font: new Font({ family: "system-ui", size: 14, unit: FontUnit.Px, color: Color.White, textAlign: TextAlign.Center }),
+        });
+        game.add(label);
+      });
+
+    } else {
+      // --- 8-direction: 3×3 compass layout with auto-cycling actions ---
+      const cellW = CELL + PAD * 2;
+      const canvasW = cellW * 3;
+      const canvasH = cellW * 3 + 40; // bottom label row
+
+      document.getElementById("title").textContent = "Sprite Sheet Preview";
+
+      const game = new Engine({
+        canvasElementId: "game",
+        width: canvasW,
+        height: canvasH,
+        backgroundColor: Color.fromHex("#2a2a2a"),
+        antialiasing: false,
+        pixelArt: true,
+      });
+
+      await game.start(loader);
+
+      const sheet = SpriteSheet.fromImageSource({
+        image,
+        grid: {
+          columns: manifest.columns,
+          rows: manifest.rows,
+          spriteWidth: manifest.frameSize,
+          spriteHeight: manifest.frameSize,
+        },
+      });
+
+      // compass layout: [gridRow][gridCol] = direction name or null (center)
+      const layout = [
+        ["north-west", "north",  "north-east"],
+        ["west",       null,     "east"],
+        ["south-west", "south",  "south-east"],
+      ];
+
+      // Pre-build Animation objects for every (direction, actionName) pair
+      // animsByDir[dir][actionName] = Animation
+      const animsByDir = {};
+      for (const dir of manifest.directions) {
+        animsByDir[dir] = {};
+        for (const actionName of actionNames) {
+          const a = manifest.actions[actionName];
+          const row = a.rowByDirection[dir];
+          const frames = [];
+          for (let c = 0; c < a.frameCount; c++) {
+            frames.push({ graphic: sheet.getSprite(c, row), duration: a.durationMs });
+          }
+          const anim = new Animation({ frames });
+          anim.scale = new Vector(SCALE, SCALE);
+          animsByDir[dir][actionName] = anim;
+        }
       }
-      const anim = new Animation({ frames });
-      anim.scale = new Vector(SCALE, SCALE);
 
-      const actor = new Actor({
-        x: PAD + i * cellW + (manifest.frameSize * SCALE) / 2,
-        y: PAD + (manifest.frameSize * SCALE) / 2,
-        width: manifest.frameSize * SCALE,
-        height: manifest.frameSize * SCALE,
-      });
-      actor.graphics.use(anim);
-      game.add(actor);
+      // Create one Actor per non-null compass cell
+      const actorsByDir = {};
+      for (let gridRow = 0; gridRow < 3; gridRow++) {
+        for (let gridCol = 0; gridCol < 3; gridCol++) {
+          const dir = layout[gridRow][gridCol];
+          if (!dir) continue;
+          const cx = gridCol * cellW + cellW / 2;
+          const cy = gridRow * cellW + cellW / 2;
+          const actor = new Actor({ x: cx, y: cy, width: CELL, height: CELL });
+          actor.graphics.use(animsByDir[dir][actionNames[0]]);
+          game.add(actor);
+          actorsByDir[dir] = actor;
+        }
+      }
 
-      const label = new Label({
-        text: name,
-        x: PAD + i * cellW + (manifest.frameSize * SCALE) / 2,
-        y: PAD + manifest.frameSize * SCALE + 18,
-        font: new Font({ family: "system-ui", size: 14, unit: FontUnit.Px, color: Color.White, textAlign: TextAlign.Center }),
+      // Bottom label showing current action
+      const actionLabel = new Label({
+        text: actionNames[0],
+        x: canvasW / 2,
+        y: cellW * 3 + 24,
+        font: new Font({ family: "system-ui", size: 16, unit: FontUnit.Px, color: Color.White, textAlign: TextAlign.Center }),
       });
-      game.add(label);
-    });
+      game.add(actionLabel);
+
+      // Auto-cycle through actions every 3 seconds
+      let currentActionIdx = 0;
+      setInterval(() => {
+        currentActionIdx = (currentActionIdx + 1) % actionNames.length;
+        const nextAction = actionNames[currentActionIdx];
+        actionLabel.text = nextAction;
+        for (const dir of manifest.directions) {
+          actorsByDir[dir].graphics.use(animsByDir[dir][nextAction]);
+        }
+      }, 3000);
+    }
   </script>
 </body>
 </html>

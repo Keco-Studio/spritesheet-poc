@@ -5,6 +5,7 @@ const valid = {
   name: "knight",
   description: "a knight",
   size: 64,
+  directions: 1 as const,
   actions: [
     { name: "idle", prompt: "still", frames: 4 },
     { name: "walk", prompt: "walking", frames: 8 },
@@ -43,5 +44,13 @@ describe("parseConfig", () => {
 
   it("rejects empty actions list", () => {
     expect(() => parseConfig({ ...valid, actions: [] })).toThrow();
+  });
+
+  it("accepts directions: 8", () => {
+    expect(parseConfig({ ...valid, directions: 8 })).toMatchObject({ directions: 8 });
+  });
+
+  it("rejects directions: 4", () => {
+    expect(() => parseConfig({ ...valid, directions: 4 })).toThrow();
   });
 });

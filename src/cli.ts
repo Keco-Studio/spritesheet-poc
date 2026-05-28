@@ -6,9 +6,11 @@ import { loadConfig } from "./config.js";
 import { createClient, PixelLabError } from "./pixellab/client.js";
 import { generateBaseSprite } from "./pixellab/generate.js";
 import { animateAction } from "./pixellab/animate.js";
+import { generate8Directions } from "./pixellab/generate8.js";
 import { buildManifest } from "./sheet/manifest.js";
 import { packSheet } from "./sheet/pack.js";
 import { emitPreview } from "./preview/emit.js";
+import { DIRECTIONS_1, DIRECTIONS_8 } from "./types.js";
 
 type Args = { configPath: string; outDir: string; open: boolean };
 
@@ -51,23 +53,47 @@ async function main(): Promise<void> {
   mkdirSync(characterOut, { recursive: true });
 
   const client = createClient(apiKey);
+  const dirCount = config.directions ?? 1;
+  const directions = dirCount === 8 ? DIRECTIONS_8 : DIRECTIONS_1;
 
-  let t = ts();
-  console.log(`▸ ${config.name}: generating base sprite...`);
-  const baseBase64 = await generateBaseSprite(client, config.description, config.size);
-  console.log(`  done (${fmt(ts() - t)})`);
+  // Build base sprites: Record<direction, base64>
+  let baseSpritesByDir: Record<string, string>;
 
-  const rowsFrames: Buffer[][] = [];
-  for (const action of config.actions) {
-    t = ts();
-    console.log(`▸ ${config.name}/${action.name}: animating (${action.frames} frames)...`);
-    const frames = await animateAction(client, baseBase64, action.prompt, action.frames, config.size);
+  if (dirCount === 8) {
+    let t = ts();
+    console.log(`▸ ${config.name}: generating 8-direction base sprites...`);
+    baseSpritesByDir = await generate8Directions(client, config.description, config.size);
     console.log(`  done (${fmt(ts() - t)})`);
-    rowsFrames.push(frames.map((b64) => Buffer.from(b64, "base64")));
+  } else {
+    let t = ts();
+    console.log(`▸ ${config.name}: generating base sprite...`);
+    const baseBase64 = await generateBaseSprite(client, config.description, config.size);
+    console.log(`  done (${fmt(ts() - t)})`);
+    baseSpritesByDir = { south: baseBase64 };
+  }
+
+  // Animate every direction × action pair, build rowsFrames in manifest row order.
+  // Row index = dirIdx * actions.length + actionIdx
+  const totalRows = directions.length * config.actions.length;
+  const rowsFrames: Buffer[][] = new Array(totalRows);
+
+  for (let dirIdx = 0; dirIdx < directions.length; dirIdx++) {
+    const dir = directions[dirIdx];
+    const baseBase64 = baseSpritesByDir[dir];
+    for (let actionIdx = 0; actionIdx < config.actions.length; actionIdx++) {
+      const action = config.actions[actionIdx];
+      const rowIndex = dirIdx * config.actions.length + actionIdx;
+      let t = ts();
+      console.log(`▸ ${config.name}/${dir}/${action.name}: animating (${action.frames} frames)...`);
+      const frames = await animateAction(client, baseBase64, action.prompt, action.frames, config.size);
+      console.log(`  done (${fmt(ts() - t)})`);
+      rowsFrames[rowIndex] = frames.map((b64) => Buffer.from(b64, "base64"));
+    }
   }
 
   const manifest = buildManifest(
     config.size,
+    directions,
     config.actions.map((a) => ({ name: a.name, frames: a.frames })),
   );
 

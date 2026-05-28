@@ -13,6 +13,7 @@ const ConfigSchema = z
     name: z.string().min(1).regex(/^[a-z0-9-]+$/, "name must be kebab-case"),
     description: z.string().min(1),
     size: z.literal(64),
+    directions: z.union([z.literal(1), z.literal(8)]).optional().default(1),
     actions: z.array(ActionSchema).min(1).max(8),
   })
   .refine(
