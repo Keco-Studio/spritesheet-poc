@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import type { PixelLabClient } from "./client.js";
 import { PixelLabError } from "./client.js";
 import { waitForJob } from "./poll.js";
@@ -5,13 +6,18 @@ import { waitForJob } from "./poll.js";
 type StartResponse = { background_job_id: string };
 
 /**
- * Returns N base64 PNG strings (no data: prefix), one per animation frame.
+ * Returns `frameCount` base64 PNG strings (no data: prefix), each resized to `size`×`size`.
+ *
+ * animate-with-text-v3 sometimes returns `frameCount + 1` images (the input frame echoed
+ * back as image[0], followed by the new frames). We drop any leading frames and resize
+ * defensively in case the model returns at a non-matching resolution.
  */
 export async function animateAction(
   client: PixelLabClient,
   firstFrameBase64: string,
   action: string,
   frameCount: number,
+  size: number,
 ): Promise<string[]> {
   const start = await client.post<StartResponse>("/animate-with-text-v3", {
     first_frame: { type: "base64", base64: firstFrameBase64 },
@@ -28,7 +34,16 @@ export async function animateAction(
       JSON.stringify(job.last_response).slice(0, 500),
     );
   }
-  return images.map((img) => stripDataUrl(img.base64));
+
+  const trimmed = images.slice(images.length - frameCount);
+  return Promise.all(
+    trimmed.map(async (img) => {
+      const raw = stripDataUrl(img.base64);
+      const buf = Buffer.from(raw, "base64");
+      const resized = await sharp(buf).resize(size, size, { kernel: "nearest" }).png().toBuffer();
+      return resized.toString("base64");
+    }),
+  );
 }
 
 function stripDataUrl(s: string): string {

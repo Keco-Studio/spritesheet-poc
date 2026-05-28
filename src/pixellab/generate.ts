@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import type { PixelLabClient } from "./client.js";
 import { PixelLabError } from "./client.js";
 import { waitForJob } from "./poll.js";
@@ -5,10 +6,12 @@ import { waitForJob } from "./poll.js";
 type CreateCharacterStartResponse = { background_job_id: string };
 
 /**
- * Returns the south-facing 64x64 PNG as a raw base64 string (no data: prefix).
+ * Returns the south-facing sprite as a raw base64 PNG (no data: prefix), resized to `size`×`size`.
  *
  * create-character-v3 persists the character and returns storage URLs rather than
- * inline base64, so we fetch the south rotation and convert it ourselves.
+ * inline base64, and the returned PNG is the model's native resolution (often >64px)
+ * regardless of the requested image_size. We resize to `size` here so downstream
+ * animation frames come back at the right resolution.
  */
 export async function generateBaseSprite(
   client: PixelLabClient,
@@ -41,6 +44,10 @@ export async function generateBaseSprite(
       await res.text(),
     );
   }
-  const buf = Buffer.from(await res.arrayBuffer());
-  return buf.toString("base64");
+  const original = Buffer.from(await res.arrayBuffer());
+  const resized = await sharp(original)
+    .resize(size, size, { kernel: "nearest" })
+    .png()
+    .toBuffer();
+  return resized.toString("base64");
 }

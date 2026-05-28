@@ -61,7 +61,7 @@ async function main(): Promise<void> {
   for (const action of config.actions) {
     t = ts();
     console.log(`▸ ${config.name}/${action.name}: animating (${action.frames} frames)...`);
-    const frames = await animateAction(client, baseBase64, action.prompt, action.frames);
+    const frames = await animateAction(client, baseBase64, action.prompt, action.frames, config.size);
     console.log(`  done (${fmt(ts() - t)})`);
     rowsFrames.push(frames.map((b64) => Buffer.from(b64, "base64")));
   }
