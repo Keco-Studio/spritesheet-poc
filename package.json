@@ -8,6 +8,9 @@
   },
   "scripts": {
     "gen": "tsx src/cli.ts",
+    "tileset": "tsx src/tileset-cli.ts",
+    "map": "tsx src/map-cli.ts",
+    "buildmap": "tsx src/buildmap-cli.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

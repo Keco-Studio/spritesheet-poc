@@ -1,0 +1,337 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Tilemap Editor</title>
+  <style>
+    :root { --bg: #1a1a1a; --panel: #242424; --accent: #4caf50; }
+    body { background: var(--bg); color: #eee; font-family: system-ui, sans-serif; margin: 0; padding: 16px; }
+    h1 { font-size: 16px; margin: 0 0 12px; }
+
+    #toolbar {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      background: var(--panel); padding: 10px; border-radius: 8px; margin-bottom: 12px;
+    }
+    #toolbar button, #toolbar label.filebtn {
+      background: #333; color: #eee; border: 1px solid #444; border-radius: 6px;
+      padding: 6px 12px; font-size: 13px; cursor: pointer;
+    }
+    #toolbar button:hover, #toolbar label.filebtn:hover { background: #3d3d3d; }
+    #toolbar .sep { width: 1px; height: 24px; background: #444; margin: 0 4px; }
+
+    /* Palette: a row of buttons, each showing one tile via background-position crop. */
+    #palette {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      background: var(--panel); padding: 8px; border-radius: 8px; margin-bottom: 12px;
+      max-height: 220px; overflow-y: auto;
+    }
+    .tile-btn {
+      border: 2px solid transparent; border-radius: 4px; padding: 0; cursor: pointer;
+      background-color: #111; background-repeat: no-repeat;
+      image-rendering: pixelated; box-sizing: content-box;
+    }
+    .tile-btn.active { border-color: var(--accent); }
+    .tile-btn.eraser {
+      display: flex; align-items: center; justify-content: center;
+      background-color: #2a2a2a; color: #ccc; font-size: 11px; font-weight: bold;
+    }
+
+    #game { image-rendering: pixelated; border: 1px solid #333; display: block; }
+    #status { font-size: 12px; opacity: 0.8; margin-top: 10px; line-height: 1.6; }
+    code { background: #000; padding: 1px 5px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <h1 id="title">Tilemap Editor</h1>
+
+  <div id="toolbar">
+    <button id="btn-save">Save</button>
+    <button id="btn-load">Load</button>
+    <span class="sep"></span>
+    <button id="btn-export">Export JSON</button>
+    <label class="filebtn">Import JSON<input id="file-import" type="file" accept="application/json,.json" hidden /></label>
+    <span class="sep"></span>
+    <button id="btn-clear">Clear All</button>
+  </div>
+
+  <div id="palette"></div>
+
+  <canvas id="game"></canvas>
+
+  <div id="status"></div>
+
+  <!-- Injected by emit.ts. Kept as inert JSON so a stray "<" can't break parsing. -->
+  <script type="application/json" id="meta-json">__TILESET_META__</script>
+
+  <script type="module">
+    import { Engine, ImageSource, SpriteSheet, TileMap, Vector, Color, Loader, vec } from "https://esm.sh/excalibur@0.30.3";
+
+    // --- Injected data ----------------------------------------------------
+    const TILESET_SRC = "__TILESET_SRC__";
+    const meta = JSON.parse(document.getElementById("meta-json").textContent);
+
+    // The paint surface is always 32x32 logical tiles for the POC, sized at the
+    // tileset's native tile dimensions. The palette is every grid cell.
+    const MAP_COLS = 32;
+    const MAP_ROWS = 32;
+    const TW = meta.tileWidth;
+    const TH = meta.tileHeight;
+    const PALETTE_COUNT = meta.columns * meta.rows;
+    const ERASER = -1; // active index sentinel for erase mode
+
+    document.getElementById("title").textContent =
+      "Tilemap Editor" + (meta.name ? " — " + meta.name : "");
+
+    // --- Excalibur engine -------------------------------------------------
+    // pixelArt + no antialiasing keeps tiles crisp; CSS image-rendering matches.
+    const game = new Engine({
+      canvasElementId: "game",
+      width: 800,
+      height: 600,
+      backgroundColor: Color.fromHex("#202830"),
+      antialiasing: false,
+      pixelArt: true,
+    });
+
+    const image = new ImageSource(TILESET_SRC);
+    await game.start(new Loader([image]));
+
+    const sheet = SpriteSheet.fromImageSource({
+      image,
+      grid: {
+        columns: meta.columns,
+        rows: meta.rows,
+        spriteWidth: TW,
+        spriteHeight: TH,
+      },
+    });
+
+    // Flat palette: index = row*columns + col. getSprite takes (col, row).
+    const sprites = [];
+    for (let r = 0; r < meta.rows; r++) {
+      for (let c = 0; c < meta.columns; c++) {
+        sprites[r * meta.columns + c] = sheet.getSprite(c, r);
+      }
+    }
+
+    // --- TileMap ----------------------------------------------------------
+    const map = new TileMap({
+      pos: vec(0, 0),
+      columns: MAP_COLS,
+      rows: MAP_ROWS,
+      tileWidth: TW,
+      tileHeight: TH,
+    });
+    game.currentScene.add(map);
+
+    // Center the map in the canvas and pick a zoom that shows it fully.
+    const cam = game.currentScene.camera;
+    cam.pos = vec((MAP_COLS * TW) / 2, (MAP_ROWS * TH) / 2);
+    cam.zoom = Math.min(
+      game.drawWidth / (MAP_COLS * TW),
+      game.drawHeight / (MAP_ROWS * TH),
+    );
+
+    // --- Active tile / palette UI ----------------------------------------
+    let activeIndex = 0; // index into `sprites`, or ERASER
+
+    const paletteEl = document.getElementById("palette");
+    // We size palette swatches up so they're clickable; scale = swatch / nativeTile.
+    const SWATCH = 32;
+    const sx = SWATCH / TW;
+    const sy = SWATCH / TH;
+
+    function makePaletteButton(idx) {
+      const btn = document.createElement("button");
+      btn.className = "tile-btn";
+      btn.style.width = SWATCH + "px";
+      btn.style.height = SWATCH + "px";
+      // Crop the full tileset image to this cell via background-position.
+      // Scale the whole sheet up by (sx, sy) so each cell fills the swatch.
+      const c = idx % meta.columns;
+      const r = Math.floor(idx / meta.columns);
+      btn.style.backgroundImage = `url("${TILESET_SRC}")`;
+      btn.style.backgroundSize = `${meta.width * sx}px ${meta.height * sy}px`;
+      btn.style.backgroundPosition = `-${c * TW * sx}px -${r * TH * sy}px`;
+      btn.title = "Tile #" + idx;
+      btn.addEventListener("click", () => setActive(idx));
+      return btn;
+    }
+
+    const buttons = [];
+    for (let i = 0; i < PALETTE_COUNT; i++) {
+      const b = makePaletteButton(i);
+      buttons.push(b);
+      paletteEl.appendChild(b);
+    }
+    // Eraser button (index ERASER).
+    const eraserBtn = document.createElement("button");
+    eraserBtn.className = "tile-btn eraser";
+    eraserBtn.style.width = SWATCH + "px";
+    eraserBtn.style.height = SWATCH + "px";
+    eraserBtn.textContent = "ERASE";
+    eraserBtn.title = "Eraser";
+    eraserBtn.addEventListener("click", () => setActive(ERASER));
+    paletteEl.appendChild(eraserBtn);
+
+    function setActive(idx) {
+      activeIndex = idx;
+      buttons.forEach((b, i) => b.classList.toggle("active", i === idx));
+      eraserBtn.classList.toggle("active", idx === ERASER);
+      updateStatus();
+    }
+    setActive(0);
+
+    // --- Painting ---------------------------------------------------------
+    // Pointer worldPos is already camera-transformed, so getTileByPoint stays
+    // correct under any zoom/pan. We only paint while the primary button is held.
+    let painting = false;
+
+    function paintAt(worldPos) {
+      const tile = map.getTileByPoint(worldPos);
+      if (!tile) return;
+      if (activeIndex === ERASER) {
+        tile.clearGraphics();
+        tile.data.delete("idx");
+      } else {
+        tile.clearGraphics();
+        tile.addGraphic(sprites[activeIndex]);
+        tile.data.set("idx", activeIndex);
+      }
+    }
+
+    const pointer = game.input.pointers.primary;
+    pointer.on("down", (evt) => {
+      painting = true;
+      paintAt(evt.worldPos);
+    });
+    pointer.on("move", (evt) => {
+      if (painting) paintAt(evt.worldPos);
+    });
+    pointer.on("up", () => { painting = false; });
+    // If the mouse leaves the canvas mid-stroke, stop so we don't keep painting.
+    game.canvas.addEventListener("pointerleave", () => { painting = false; });
+
+    // --- Camera: zoom (wheel) + pan (WASD / arrows) ----------------------
+    const MIN_ZOOM = 0.5, MAX_ZOOM = 8;
+    game.canvas.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      cam.zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, cam.zoom * factor));
+      updateStatus();
+    }, { passive: false });
+
+    // Track held pan keys; pan is wired through the engine update loop so it's
+    // smooth and never tangled with pointer painting.
+    const held = new Set();
+    const PAN_KEYS = {
+      KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0],
+      ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+    };
+    window.addEventListener("keydown", (e) => {
+      if (PAN_KEYS[e.code]) { held.add(e.code); e.preventDefault(); }
+    });
+    window.addEventListener("keyup", (e) => { held.delete(e.code); });
+
+    const PAN_SPEED = 400; // world px per second at zoom 1
+    game.on("preupdate", (evt) => {
+      if (held.size === 0) return;
+      let dx = 0, dy = 0;
+      for (const code of held) { dx += PAN_KEYS[code][0]; dy += PAN_KEYS[code][1]; }
+      // Divide by zoom so the pan feels consistent on screen at any zoom.
+      const step = (PAN_SPEED * (evt.delta / 1000)) / cam.zoom;
+      cam.pos = cam.pos.add(vec(dx * step, dy * step));
+      updateStatus();
+    });
+
+    // --- Serialize / persistence -----------------------------------------
+    // cells[i] = the painted tile idx, or -1 if empty. map.tiles is row-major.
+    function serialize() {
+      const cells = map.tiles.map((t) => (t.data.has("idx") ? t.data.get("idx") : -1));
+      return { columns: MAP_COLS, rows: MAP_ROWS, tileWidth: TW, tileHeight: TH, cells };
+    }
+
+    function applyState(state) {
+      const cells = state.cells || [];
+      for (let i = 0; i < map.tiles.length; i++) {
+        const tile = map.tiles[i];
+        const idx = cells[i];
+        tile.clearGraphics();
+        if (idx === undefined || idx === -1 || !sprites[idx]) {
+          tile.data.delete("idx");
+        } else {
+          tile.addGraphic(sprites[idx]);
+          tile.data.set("idx", idx);
+        }
+      }
+    }
+
+    function clearAll() {
+      for (const tile of map.tiles) {
+        tile.clearGraphics();
+        tile.data.delete("idx");
+      }
+    }
+
+    document.getElementById("btn-save").addEventListener("click", () => {
+      localStorage.setItem("tilemap", JSON.stringify(serialize()));
+      flashStatus("Saved to localStorage.");
+    });
+
+    document.getElementById("btn-load").addEventListener("click", () => {
+      const raw = localStorage.getItem("tilemap");
+      if (!raw) { flashStatus("Nothing saved in localStorage."); return; }
+      applyState(JSON.parse(raw));
+      flashStatus("Loaded from localStorage.");
+    });
+
+    document.getElementById("btn-export").addEventListener("click", () => {
+      const blob = new Blob([JSON.stringify(serialize(), null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = (meta.name || "tilemap") + ".json";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    document.getElementById("file-import").addEventListener("change", (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          applyState(JSON.parse(String(reader.result)));
+          flashStatus("Imported " + file.name + ".");
+        } catch (err) {
+          flashStatus("Import failed: " + err.message);
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = ""; // allow re-importing the same file
+    });
+
+    document.getElementById("btn-clear").addEventListener("click", () => {
+      clearAll();
+      flashStatus("Cleared all tiles.");
+    });
+
+    // --- Status line ------------------------------------------------------
+    const statusEl = document.getElementById("status");
+    let flashMsg = "";
+    function updateStatus() {
+      const active = activeIndex === ERASER ? "Eraser" : "Tile #" + activeIndex;
+      statusEl.innerHTML =
+        `Active: <code>${active}</code> &nbsp; Zoom: <code>${cam.zoom.toFixed(2)}x</code><br>` +
+        `Paint: <code>click + drag</code> &nbsp; Pan: <code>WASD / arrows</code> &nbsp; Zoom: <code>mouse wheel</code>` +
+        (flashMsg ? ` &nbsp; — <code>${flashMsg}</code>` : "");
+    }
+    function flashStatus(msg) {
+      flashMsg = msg;
+      updateStatus();
+      setTimeout(() => { if (flashMsg === msg) { flashMsg = ""; updateStatus(); } }, 2500);
+    }
+    updateStatus();
+  </script>
+</body>
+</html>

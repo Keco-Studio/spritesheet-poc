@@ -9,6 +9,7 @@ import { animateAction } from "./pixellab/animate.js";
 import { generate8Directions } from "./pixellab/generate8.js";
 import { buildManifest } from "./sheet/manifest.js";
 import { packSheet } from "./sheet/pack.js";
+import { removeFlatBackground } from "./sheet/transparency.js";
 import { emitPreview } from "./preview/emit.js";
 import { DIRECTIONS_1, DIRECTIONS_8 } from "./types.js";
 
@@ -142,7 +143,9 @@ async function main(): Promise<void> {
   );
 
   console.log(`▸ packing sheet ${manifest.columns}×${manifest.rows} @ ${config.size}px...`);
-  const sheetPng = await packSheet(config.size, manifest.columns, manifest.rows, rowsFrames);
+  const packed = await packSheet(config.size, manifest.columns, manifest.rows, rowsFrames);
+  // PixelLab bakes a flat backdrop into each frame; key it out so sprites are transparent.
+  const sheetPng = await removeFlatBackground(packed);
   writeFileSync(join(characterOut, "spritesheet.png"), sheetPng);
   writeFileSync(join(characterOut, "spritesheet.json"), JSON.stringify(manifest, null, 2));
 

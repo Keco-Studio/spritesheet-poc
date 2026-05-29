@@ -1,0 +1,235 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Map + Character</title>
+  <style>
+    body { background: #111; color: #ddd; font-family: system-ui, sans-serif; margin: 0; padding: 16px; }
+    h1 { font-size: 16px; margin: 0 0 12px; font-weight: 600; }
+    #game { image-rendering: pixelated; border: 1px solid #333; }
+    .hint { font-size: 12px; opacity: 0.65; margin-top: 10px; line-height: 1.5; }
+    kbd { background: #2a2a2a; border: 1px solid #444; border-radius: 3px; padding: 1px 5px; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <h1 id="title">Map + Character</h1>
+  <canvas id="game"></canvas>
+  <div class="hint">
+    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrow keys to walk &middot;
+    the character faces its movement direction and plays its walk animation, idle when still.
+    <span id="meta"></span>
+  </div>
+
+  <script type="application/json" id="map-meta">__MAP_META__</script>
+  <script type="application/json" id="manifest">__MANIFEST_JSON__</script>
+  <script type="application/json" id="objects">__OBJECTS_JSON__</script>
+
+  <script type="module">
+    import {
+      Engine, ImageSource, SpriteSheet, Animation, Actor, Vector, Color, Loader, Keys, Circle,
+    } from "https://esm.sh/excalibur@0.30.3";
+
+    const MAP_SRC  = "__MAP_SRC__";
+    const CHAR_SRC = "__CHAR_SRC__";
+    const COLLISION_SRC = "__COLLISION_SRC__"; // "" when there is no collision layer
+    const mapMeta  = JSON.parse(document.getElementById("map-meta").textContent);
+    const manifest = JSON.parse(document.getElementById("manifest").textContent);
+    const objects  = JSON.parse(document.getElementById("objects").textContent); // [{src,x,y,w,h,shadow}]
+
+    // ---- tunables -----------------------------------------------------------
+    const ZOOM = 2;            // global pixel-art magnification (crisp via pixelArt:true)
+    const CHAR_SCALE = 0.9;    // scale the 64px character frame to sit nicely on the map
+    const SPEED = 70;          // walk speed in world px/sec (pre-zoom)
+    const VIEWPORT = Math.min(mapMeta.width, 320) * ZOOM; // square canvas, scrolls if map is bigger
+
+    document.getElementById("meta").textContent =
+      ` · map ${mapMeta.width}×${mapMeta.height}, character ${manifest.frameSize}px`;
+
+    // ---- engine -------------------------------------------------------------
+    const game = new Engine({
+      canvasElementId: "game",
+      width: VIEWPORT,
+      height: VIEWPORT,
+      backgroundColor: Color.fromHex("#0c0c0c"),
+      antialiasing: false,
+      pixelArt: true,
+    });
+
+    const mapImage = new ImageSource(MAP_SRC);
+    const charImage = new ImageSource(CHAR_SRC);
+    const objectImages = objects.map((o) => new ImageSource(o.src));
+    const loader = new Loader([mapImage, charImage, ...objectImages]);
+    loader.suppressPlayButton = true;
+    await game.start(loader);
+
+    // ---- collision layer (optional) ----------------------------------------
+    // A black/white mask the same size as the map: white = blocked. We read its
+    // pixels into an offscreen canvas and sample in world coords (the map spans
+    // world [0..width] x [0..height], so world (x,y) maps 1:1 to a mask pixel).
+    let solidAt = () => false; // no collision by default
+    if (COLLISION_SRC) {
+      const img = new Image();
+      img.src = COLLISION_SRC;
+      await img.decode();
+      const off = document.createElement("canvas");
+      off.width = mapMeta.width;
+      off.height = mapMeta.height;
+      const octx = off.getContext("2d");
+      octx.drawImage(img, 0, 0, mapMeta.width, mapMeta.height);
+      const px = octx.getImageData(0, 0, mapMeta.width, mapMeta.height).data;
+      solidAt = (wx, wy) => {
+        const x = Math.floor(wx), y = Math.floor(wy);
+        if (x < 0 || y < 0 || x >= mapMeta.width || y >= mapMeta.height) return true; // off-map = wall
+        return px[(y * mapMeta.width + x) * 4] > 128; // red channel of white = blocked
+      };
+    }
+
+    // ---- map background -----------------------------------------------------
+    // Anchored at (0,0) so the map spans world coords [0..width] x [0..height].
+    // z far below everything so ground always draws first.
+    const mapActor = new Actor({ pos: new Vector(0, 0), anchor: new Vector(0, 0), z: -100000 });
+    mapActor.graphics.use(mapImage.toSprite());
+    game.add(mapActor);
+
+    // ---- object props (y-sorted) -------------------------------------------
+    // Each prop is its own actor anchored at its bottom-center (its "feet"), and
+    // its z = feet Y. The player's z is also its feet Y, so whoever's feet are
+    // lower on screen draws on top — the character walks BEHIND a tree's canopy
+    // and in FRONT of its base. This depth is what makes props look part of the
+    // world rather than pasted on. A soft contact shadow grounds tall props.
+    objects.forEach((o, i) => {
+      const feetY = o.y + o.h;
+      const cx = o.x + o.w / 2;
+      if (o.shadow) {
+        const shadow = new Actor({ pos: new Vector(cx, feetY - Math.max(2, o.h * 0.06)), z: feetY - 1 });
+        shadow.graphics.use(new Circle({ radius: Math.max(5, o.w * 0.42), color: Color.fromRGB(0, 0, 0, 0.28) }));
+        shadow.scale = new Vector(1, 0.4); // squash circle into a ground ellipse
+        game.add(shadow);
+      }
+      const sprite = objectImages[i].toSprite();
+      const actor = new Actor({ pos: new Vector(cx, feetY), anchor: new Vector(0.5, 1), z: feetY });
+      actor.graphics.use(sprite);
+      game.add(actor);
+    });
+
+    // ---- character animations ----------------------------------------------
+    const sheet = SpriteSheet.fromImageSource({
+      image: charImage,
+      grid: {
+        columns: manifest.columns,
+        rows: manifest.rows,
+        spriteWidth: manifest.frameSize,
+        spriteHeight: manifest.frameSize,
+      },
+    });
+
+    // Prefer a "walk" action for movement and "idle" for standing; fall back to
+    // whatever the sheet has if those names are absent.
+    const actionNames = Object.keys(manifest.actions);
+    const walkName = manifest.actions.walk ? "walk" : actionNames[0];
+    const idleName = manifest.actions.idle ? "idle" : walkName;
+
+    function buildAnim(actionName, dir) {
+      const a = manifest.actions[actionName];
+      const row = a.rowByDirection[dir] ?? a.rowByDirection[manifest.directions[0]];
+      const frames = [];
+      for (let c = 0; c < a.frameCount; c++) {
+        frames.push({ graphic: sheet.getSprite(c, row), duration: a.durationMs });
+      }
+      const anim = new Animation({ frames });
+      anim.scale = new Vector(CHAR_SCALE, CHAR_SCALE);
+      return anim;
+    }
+
+    // animsByDir[dir] = { walk, idle }
+    const animsByDir = {};
+    for (const dir of manifest.directions) {
+      animsByDir[dir] = {
+        walk: buildAnim(walkName, dir),
+        idle: buildAnim(idleName, dir),
+      };
+    }
+
+    // ---- 8-direction facing from a velocity vector --------------------------
+    // Screen space: +x = east, +y = south. Sector index 0..7 starting at east,
+    // going clockwise, matching the compass names below.
+    const SECTORS = ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"];
+    function dirFromVec(vx, vy, fallback) {
+      if (vx === 0 && vy === 0) return fallback;
+      let deg = (Math.atan2(vy, vx) * 180) / Math.PI; // -180..180
+      if (deg < 0) deg += 360;
+      const want = SECTORS[Math.round(deg / 45) % 8];
+      // If this character only has some directions (e.g. 1-dir "south"), use it.
+      return manifest.directions.includes(want) ? want : manifest.directions[0];
+    }
+
+    // ---- player -------------------------------------------------------------
+    const start = new Vector(mapMeta.width / 2, mapMeta.height / 2);
+    const player = new Actor({
+      pos: start,
+      width: manifest.frameSize * CHAR_SCALE,
+      height: manifest.frameSize * CHAR_SCALE,
+      z: 1,
+    });
+    let facing = manifest.directions.includes("south") ? "south" : manifest.directions[0];
+    let currentKey = "idle:" + facing; // track to avoid restarting the animation every frame
+    player.graphics.use(animsByDir[facing].idle);
+    game.add(player);
+
+    const kb = game.input.keyboard;
+    const cam = game.currentScene.camera;
+    cam.zoom = ZOOM;
+    // Sample collision a little below center, at the character's "feet", so the
+    // body can overlap a tree canopy but the feet can't enter it.
+    const footY = (manifest.frameSize * CHAR_SCALE) * 0.25;
+    const half = (manifest.frameSize * CHAR_SCALE) / 2;
+    const halfView = VIEWPORT / (2 * ZOOM);
+    const playerFeetZ = () => player.pos.y + footY; // y-sort key: feet position
+    player.z = playerFeetZ();
+
+    // Move the player MANUALLY (velocity stays zero) so collision is tested at
+    // the TARGET position every frame, independent of engine system ordering.
+    player.vel = Vector.Zero;
+    game.on("preupdate", (evt) => {
+      const dt = (evt && typeof evt.delta === "number" ? evt.delta : 16) / 1000; // seconds
+      let vx = 0, vy = 0;
+      if (kb.isHeld(Keys.A) || kb.isHeld(Keys.Left))  vx -= 1;
+      if (kb.isHeld(Keys.D) || kb.isHeld(Keys.Right)) vx += 1;
+      if (kb.isHeld(Keys.W) || kb.isHeld(Keys.Up))    vy -= 1;
+      if (kb.isHeld(Keys.S) || kb.isHeld(Keys.Down))  vy += 1;
+
+      const moving = vx !== 0 || vy !== 0;
+      if (moving) {
+        const len = Math.hypot(vx, vy);          // normalize so diagonals aren't faster
+        const step = SPEED * dt;
+        // proposed position, clamped to the map, then collision-checked per axis
+        const nx = clamp(player.pos.x + (vx / len) * step, half, mapMeta.width - half);
+        const ny = clamp(player.pos.y + (vy / len) * step, half, mapMeta.height - half);
+        if (!solidAt(nx, player.pos.y + footY)) player.pos.x = nx;        // free in X? move
+        if (!solidAt(player.pos.x, ny + footY)) player.pos.y = ny;        // free in Y? move (slides along walls)
+        facing = dirFromVec(vx, vy, facing);
+      }
+
+      const key = (moving ? "walk:" : "idle:") + facing;
+      if (key !== currentKey) {
+        currentKey = key;
+        player.graphics.use(animsByDir[facing][moving ? "walk" : "idle"]);
+      }
+
+      player.z = playerFeetZ(); // re-sort against props so walk-behind/in-front updates
+
+      // Camera follows the player but never shows past the map edges.
+      cam.pos = new Vector(
+        clampCam(player.pos.x, mapMeta.width, halfView),
+        clampCam(player.pos.y, mapMeta.height, halfView),
+      );
+    });
+
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+    function clampCam(center, mapSize, hv) {
+      if (mapSize <= hv * 2) return mapSize / 2;      // map smaller than view -> centered
+      return clamp(center, hv, mapSize - hv);
+    }
+  </script>
+</body>
+</html>

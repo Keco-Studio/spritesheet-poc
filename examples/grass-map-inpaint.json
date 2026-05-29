@@ -1,0 +1,11 @@
+{
+  "base": "seamless flat green grass meadow, top-down, evenly textured edge to edge, no objects, no border, no path",
+  "size": 192,
+  "seed": 7,
+  "background": "green grass",
+  "features": [
+    { "rect": [20, 20, 80, 80], "prompt": "a single round leafy oak tree seen from directly above", "collides": true },
+    { "rect": [112, 28, 64, 56], "prompt": "a round blue pond of water seen from above", "collides": true },
+    { "rect": [40, 112, 72, 72], "prompt": "a pile of gray stone boulders seen from above", "collides": true }
+  ]
+}
