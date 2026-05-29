@@ -1,6 +1,6 @@
 import sharp from "sharp";
-
-export type Rect = { x: number; y: number; w: number; h: number };
+import type { Rect } from "./footprint.js";
+export type { Rect };
 
 /**
  * Build a `size`x`size` black PNG with the given rects filled white.
