@@ -1,0 +1,84 @@
+{
+  "assets": [
+    {
+      "id": "oak-tree",
+      "name": "Oak Tree",
+      "file": "oak-tree.png",
+      "footprint": 0.3,
+      "w": 54,
+      "h": 58
+    },
+    {
+      "id": "pine-tree",
+      "name": "Pine Tree",
+      "file": "pine-tree.png",
+      "footprint": 0.3,
+      "w": 30,
+      "h": 58
+    },
+    {
+      "id": "bush",
+      "name": "Bush",
+      "file": "bush.png",
+      "footprint": 0.6,
+      "w": 32,
+      "h": 31
+    },
+    {
+      "id": "rock",
+      "name": "Rock",
+      "file": "rock.png",
+      "footprint": 0.7,
+      "w": 26,
+      "h": 22
+    },
+    {
+      "id": "boulders",
+      "name": "Boulders",
+      "file": "boulders.png",
+      "footprint": 0.6,
+      "w": 72,
+      "h": 72
+    },
+    {
+      "id": "pond",
+      "name": "Pond",
+      "file": "pond.png",
+      "footprint": 1,
+      "w": 68,
+      "h": 68
+    },
+    {
+      "id": "flowers",
+      "name": "Flowers",
+      "file": "flowers.png",
+      "footprint": 0.4,
+      "w": 35,
+      "h": 36
+    },
+    {
+      "id": "stump",
+      "name": "Stump",
+      "file": "stump.png",
+      "footprint": 0.8,
+      "w": 35,
+      "h": 27
+    },
+    {
+      "id": "barrel",
+      "name": "Barrel",
+      "file": "barrel.png",
+      "footprint": 0.9,
+      "w": 27,
+      "h": 34
+    },
+    {
+      "id": "crate",
+      "name": "Crate",
+      "file": "crate.png",
+      "footprint": 0.9,
+      "w": 32,
+      "h": 30
+    }
+  ]
+}
