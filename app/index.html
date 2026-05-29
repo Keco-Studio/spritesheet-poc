@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Map + Collision Editor</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #1a1a1a; color: #ddd; display: flex; height: 100vh; }
+    #sidebar { width: 200px; background: #222; padding: 10px; overflow-y: auto; flex-shrink: 0; }
+    #sidebar h2 { font-size: 12px; text-transform: uppercase; opacity: 0.6; margin: 12px 0 6px; }
+    #palette { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .pal-item { background: #333; border: 2px solid transparent; border-radius: 4px; padding: 4px; cursor: pointer; text-align: center; font-size: 10px; }
+    .pal-item.active { border-color: #4af; }
+    .pal-item img { width: 100%; image-rendering: pixelated; height: 48px; object-fit: contain; }
+    #main { flex: 1; display: flex; flex-direction: column; }
+    #toolbar { background: #222; padding: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    #toolbar button, #toolbar label { background: #333; border: 1px solid #444; color: #ddd; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    #toolbar button.active { background: #4af; color: #000; }
+    #game { image-rendering: pixelated; flex: 1; }
+    .hint { font-size: 11px; opacity: 0.6; padding: 6px 8px; }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <h2>Assets</h2>
+    <div id="palette"></div>
+  </div>
+  <div id="main">
+    <div id="toolbar"></div>
+    <canvas id="game"></canvas>
+    <div class="hint" id="hint">Load a base map to begin.</div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
