@@ -7,6 +7,7 @@ export class EditorScene extends Scene {
   private store: Store;
   private lib: LoadedLibrary;
   private baseActor: Actor | null = null;
+  private baseMapUrl: string | null = null;
   private placementActors: Actor[] = [];
   private overlayActors: Actor[] = [];
 
@@ -48,6 +49,7 @@ export class EditorScene extends Scene {
 
     // Wheel zoom.
     engine.canvas.addEventListener("wheel", (e) => {
+      if (this.store.state.mode !== "edit") return;
       e.preventDefault();
       const cam = this.camera;
       cam.zoom = Math.max(0.5, Math.min(8, cam.zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
@@ -57,11 +59,12 @@ export class EditorScene extends Scene {
     let panning = false;
     let last = { x: 0, y: 0 };
     engine.canvas.addEventListener("mousedown", (e) => {
-      if (e.button === 1) { panning = true; last = { x: e.clientX, y: e.clientY }; e.preventDefault(); }
+      if (e.button === 1 && this.store.state.mode === "edit") { panning = true; last = { x: e.clientX, y: e.clientY }; e.preventDefault(); }
     });
     window.addEventListener("mouseup", (e) => { if (e.button === 1) panning = false; });
     window.addEventListener("mousemove", (e) => {
       if (!panning) return;
+      if (this.store.state.mode !== "edit") return;
       const dx = (e.clientX - last.x) / this.camera.zoom;
       const dy = (e.clientY - last.y) / this.camera.zoom;
       this.camera.pos = new Vector(this.camera.pos.x - dx, this.camera.pos.y - dy);
@@ -87,15 +90,21 @@ export class EditorScene extends Scene {
   private rebuild(): void {
     const s = this.store.state;
 
-    if (this.baseActor) { this.baseActor.kill(); this.baseActor = null; }
-    if (s.baseMapDataUrl) {
-      const img = new ImageSource(s.baseMapDataUrl);
-      const actor = new Actor({ pos: new Vector(0, 0), anchor: new Vector(0, 0), z: -100000 });
-      img.load().then(() => actor.graphics.use(img.toSprite()));
-      this.add(actor);
-      this.baseActor = actor;
+    // Only kill and recreate the base actor when the data URL has changed; avoids
+    // re-decoding the image on every store update (e.g. every mousemove during a drag).
+    if (s.baseMapDataUrl !== this.baseMapUrl) {
+      if (this.baseActor) { this.baseActor.kill(); this.baseActor = null; }
+      this.baseMapUrl = s.baseMapDataUrl ?? null;
+      if (s.baseMapDataUrl) {
+        const img = new ImageSource(s.baseMapDataUrl);
+        const actor = new Actor({ pos: new Vector(0, 0), anchor: new Vector(0, 0), z: -100000 });
+        img.load().then(() => actor.graphics.use(img.toSprite()));
+        this.add(actor);
+        this.baseActor = actor;
+      }
     }
 
+    // Placement actors are fully recreated on every store change; acceptable at prototype scale (small placement count).
     for (const a of this.placementActors) a.kill();
     this.placementActors = [];
     s.placements.forEach((p, i) => {
