@@ -2,7 +2,7 @@ import { Scene, Actor, Vector, ImageSource, SpriteSheet, Animation, Engine, Keys
 import type { SceneActivationContext } from "excalibur";
 import type { Store } from "./store.js";
 import type { LoadedLibrary } from "./assets.js";
-import { colliders, isSolid, type AssetLookup } from "../../src/sheet/scene-collision.js";
+import { colliders, isSolid } from "../../src/sheet/scene-collision.js";
 import type { Ellipse } from "../../src/sheet/footprint.js";
 
 type Manifest = {
@@ -138,5 +138,3 @@ export class PlayScene extends Scene {
     return this.manifest!.directions.includes(want) ? want : this.manifest!.directions[0];
   }
 }
-
-export type { AssetLookup };

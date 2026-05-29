@@ -101,6 +101,7 @@ export class EditorScene extends Scene {
         img.load().then(() => actor.graphics.use(img.toSprite()));
         this.add(actor);
         this.baseActor = actor;
+        this.camera.pos = new Vector(s.mapW / 2, s.mapH / 2);
       }
     }
 
