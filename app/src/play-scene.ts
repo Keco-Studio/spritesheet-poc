@@ -26,6 +26,9 @@ export class PlayScene extends Scene {
   // Reconciliation: Scene has no clear() method in this Excalibur version.
   // Track visuals added in rebuildVisuals so we can kill them on rebuild.
   private visualActors: Actor[] = [];
+  // Base-map actor is kept alive across rebuilds to avoid flicker when toggling Edit↔Play.
+  private baseMapUrl: string | null = null;
+  private baseActor: Actor | null = null;
 
   constructor(store: Store, lib: LoadedLibrary) { super(); this.store = store; this.lib = lib; }
 
@@ -49,12 +52,17 @@ export class PlayScene extends Scene {
     this.visualActors = [];
 
     const s = this.store.state;
-    if (s.baseMapDataUrl) {
-      const img = new ImageSource(s.baseMapDataUrl);
-      const a = new Actor({ pos: new Vector(0, 0), anchor: new Vector(0, 0), z: -100000 });
-      img.load().then(() => a.graphics.use(img.toSprite()));
-      this.add(a);
-      this.visualActors.push(a);
+    // Only (re)create the base-map actor when the URL changes, to avoid flicker on Edit↔Play toggle.
+    if (s.baseMapDataUrl !== this.baseMapUrl) {
+      this.baseMapUrl = s.baseMapDataUrl;
+      if (this.baseActor) { this.baseActor.kill(); this.baseActor = null; }
+      if (s.baseMapDataUrl) {
+        const img = new ImageSource(s.baseMapDataUrl);
+        const a = new Actor({ pos: new Vector(0, 0), anchor: new Vector(0, 0), z: -100000 });
+        img.load().then(() => a.graphics.use(img.toSprite()));
+        this.add(a);
+        this.baseActor = a;
+      }
     }
     for (const p of s.placements) {
       const e = this.lib.entry(p.assetId);

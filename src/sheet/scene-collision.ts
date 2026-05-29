@@ -42,6 +42,6 @@ export function buildCollisionExport(
     mapW,
     mapH,
     placements: known.map((p) => ({ ...p, footprint: lookup[p.assetId].footprint })),
-    colliders: known.map((p) => placementEllipse(p, lookup[p.assetId])),
+    colliders: colliders(placements, lookup),
   };
 }

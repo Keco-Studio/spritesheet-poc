@@ -16,7 +16,9 @@ export async function exportCollision(store: Store, lib: LoadedLibrary): Promise
   const { mapW, mapH, placements } = store.state;
   const json = buildCollisionExport(mapW, mapH, placements, lib.lookup);
   download("collision.json", new Blob([JSON.stringify(json, null, 2)], { type: "application/json" }));
-  download("collision.png", await collisionMaskBlob(store, lib));
+  const mask = await collisionMaskBlob(store, lib);
+  await new Promise((r) => setTimeout(r, 150)); // let the first download start before the second
+  download("collision.png", mask);
 }
 
 export async function exportComposite(store: Store, lib: LoadedLibrary): Promise<void> {

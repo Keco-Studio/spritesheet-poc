@@ -24,7 +24,8 @@ export async function collisionMaskBlob(store: Store, lib: LoadedLibrary): Promi
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, mapW, mapH);
   for (const e of colliders(placements, lib.lookup)) drawEllipse(ctx, e, "#fff");
-  return await new Promise<Blob>((res) => c.toBlob((b) => res(b!), "image/png"));
+  return await new Promise<Blob>((res, rej) =>
+    c.toBlob((b) => (b ? res(b) : rej(new Error("canvas toBlob returned null"))), "image/png"));
 }
 
 /** Composited map PNG: base map + all placed assets flattened. */
@@ -46,5 +47,6 @@ export async function compositeBlob(store: Store, lib: LoadedLibrary): Promise<B
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(img, p.x - e.w / 2, p.y - e.h, e.w, e.h);
   }
-  return await new Promise<Blob>((res) => c.toBlob((b) => res(b!), "image/png"));
+  return await new Promise<Blob>((res, rej) =>
+    c.toBlob((b) => (b ? res(b) : rej(new Error("canvas toBlob returned null"))), "image/png"));
 }
