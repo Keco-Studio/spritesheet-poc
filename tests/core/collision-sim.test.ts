@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { colliders, isSolid } from "../../src/sheet/scene-collision.js";
+import { colliders, isSolid } from "../../src/core/scene-collision.js";
 
 const lookup = { rock: { w: 60, h: 60, footprint: 1.0 } };
 // one solid rock centered at feet (200,200): footprint 1.0 => ellipse rx=30, ry=30, cy=170

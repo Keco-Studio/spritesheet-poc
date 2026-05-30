@@ -2,8 +2,8 @@ import { Scene, Actor, Vector, ImageSource, SpriteSheet, Animation, Engine, Keys
 import type { SceneActivationContext } from "excalibur";
 import type { Store } from "./store.js";
 import type { LoadedLibrary } from "./assets.js";
-import { colliders, isSolid } from "../../src/sheet/scene-collision.js";
-import type { Ellipse } from "../../src/sheet/footprint.js";
+import { colliders, isSolid } from "../../src/core/scene-collision.js";
+import type { Ellipse } from "../../src/core/footprint.js";
 
 type Manifest = {
   frameSize: number; columns: number; rows: number; directions: string[];

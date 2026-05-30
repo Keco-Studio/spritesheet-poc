@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { footprintEllipse, pointInEllipse } from "../../src/sheet/footprint.js";
+import { footprintEllipse, pointInEllipse } from "../../src/core/footprint.js";
 
 describe("footprintEllipse", () => {
   it("centers a full-footprint ellipse on the rect", () => {

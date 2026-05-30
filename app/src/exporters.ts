@@ -1,7 +1,7 @@
 import type { Store } from "./store.js";
 import type { LoadedLibrary } from "./assets.js";
-import { buildCollisionExport } from "../../src/sheet/scene-collision.js";
-import { serializeProject, parseProject, type Project } from "../../src/sheet/project-model.js";
+import { buildCollisionExport } from "../../src/core/scene-collision.js";
+import { serializeProject, parseProject, type Project } from "../../src/core/project-model.js";
 import { collisionMaskBlob, compositeBlob } from "./collision-canvas.js";
 
 function download(name: string, blob: Blob): void {

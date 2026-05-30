@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { serializeProject, parseProject } from "../../src/sheet/project-model.js";
+import { serializeProject, parseProject } from "../../src/core/project-model.js";
 
 const project = {
   baseMap: "data:image/png;base64,AAAA",

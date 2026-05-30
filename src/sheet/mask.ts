@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import type { Rect } from "./footprint.js";
+import type { Rect } from "../core/footprint.js";
 export type { Rect };
 
 /**

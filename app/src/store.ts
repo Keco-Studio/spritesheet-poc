@@ -1,4 +1,4 @@
-import type { Placement } from "../../src/sheet/scene-collision.js";
+import type { Placement } from "../../src/core/scene-collision.js";
 
 export type Mode = "edit" | "play";
 
