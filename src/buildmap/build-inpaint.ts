@@ -1,6 +1,7 @@
 import { generateMap } from "../pixellab/map.js";
 import { inpaint } from "../pixellab/inpaint.js";
-import { rectsToMaskPng, type Rect } from "../sheet/mask.js";
+import { rectsToMaskPng } from "../sheet/mask.js";
+import type { Rect } from "../core/footprint.js";
 import type { PixelLabClient } from "../pixellab/client.js";
 import { rectOf, type Spec, type BuiltMap } from "./spec.js";
 

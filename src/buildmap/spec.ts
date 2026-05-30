@@ -6,7 +6,7 @@ const FeatureSchema = z.object({
   rect: z.tuple([z.number(), z.number(), z.number(), z.number()]), // [x, y, w, h]
   prompt: z.string().min(1),
   collides: z.boolean().optional().default(true),
-  /** Inpaint text-guidance strength; higher = more literal object. Default 7. */
+  /** Inpaint text-guidance strength; higher = more literal object. Default 8. */
   guidance: z.number().optional(),
   /** Fraction of the object's HEIGHT (from the bottom) that is solid — the base
    * footprint. 0.4 suits tall props (tree trunk/rock base, walk behind the top);
