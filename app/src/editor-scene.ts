@@ -1,7 +1,7 @@
 import { Scene, Actor, Vector, ImageSource, Color, Rectangle, Circle, Engine, Keys } from "excalibur";
 import type { Store } from "./store.js";
 import type { LoadedLibrary } from "./assets.js";
-import { colliders } from "../../src/sheet/scene-collision.js";
+import { colliders } from "../../src/core/scene-collision.js";
 
 export class EditorScene extends Scene {
   private store: Store;

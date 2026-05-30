@@ -9,7 +9,7 @@ import { generateMap } from "./pixellab/map.js";
 import { generateObject } from "./pixellab/object.js";
 import { inpaint } from "./pixellab/inpaint.js";
 import { rectsToMaskPng, type Rect } from "./sheet/mask.js";
-import { footprintEllipse } from "./sheet/footprint.js";
+import { footprintEllipse } from "./core/footprint.js";
 import { removeFlatBackground } from "./sheet/transparency.js";
 import { emitGame, type ObjectPlacement } from "./game/emit.js";
 import type { Manifest } from "./types.js";

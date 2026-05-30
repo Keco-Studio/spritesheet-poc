@@ -8,5 +8,5 @@
     "skipLibCheck": true,
     "types": ["vite/client"]
   },
-  "include": ["src", "../src/sheet"]
+  "include": ["src", "../src/core"]
 }

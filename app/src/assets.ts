@@ -1,6 +1,6 @@
 import { ImageSource } from "excalibur";
-import { parseManifest, toAssetLookup, type AssetManifest, type AssetEntry } from "../../src/sheet/manifest-schema.js";
-import type { AssetLookup } from "../../src/sheet/scene-collision.js";
+import { parseManifest, toAssetLookup, type AssetManifest, type AssetEntry } from "../../src/core/manifest-schema.js";
+import type { AssetLookup } from "../../src/core/scene-collision.js";
 
 export type LoadedLibrary = {
   manifest: AssetManifest;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseManifest, toAssetLookup } from "../../src/sheet/manifest-schema.js";
+import { parseManifest, toAssetLookup } from "../../src/core/manifest-schema.js";
 
 const good = {
   assets: [

@@ -1,7 +1,7 @@
-import type { Ellipse } from "../../src/sheet/footprint.js";
+import type { Ellipse } from "../../src/core/footprint.js";
 import type { Store } from "./store.js";
 import type { LoadedLibrary } from "./assets.js";
-import { colliders } from "../../src/sheet/scene-collision.js";
+import { colliders } from "../../src/core/scene-collision.js";
 
 function newCanvas(w: number, h: number): { c: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
   const c = document.createElement("canvas");

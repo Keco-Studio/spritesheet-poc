@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { placementRect, colliders, isSolid, buildCollisionExport } from "../../src/sheet/scene-collision.js";
+import { placementRect, colliders, isSolid, buildCollisionExport } from "../../src/core/scene-collision.js";
 
 const lookup = {
   tree: { w: 40, h: 60, footprint: 0.3 },
