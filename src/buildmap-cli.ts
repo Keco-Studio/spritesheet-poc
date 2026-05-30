@@ -9,6 +9,7 @@ import { generateMap } from "./pixellab/map.js";
 import { generateObject } from "./pixellab/object.js";
 import { inpaint } from "./pixellab/inpaint.js";
 import { rectsToMaskPng, type Rect } from "./sheet/mask.js";
+import { footprintEllipse } from "./sheet/footprint.js";
 import { removeFlatBackground } from "./sheet/transparency.js";
 import { emitGame, type ObjectPlacement } from "./game/emit.js";
 import type { Manifest } from "./types.js";
@@ -135,17 +136,14 @@ async function trimToContent(
 }
 
 function stampFootprint(collision: Uint8Array, size: number, rect: Rect, footprint: number): void {
-  const rx = rect.w / 2;
-  const ry = Math.max(1, (rect.h * footprint) / 2);
-  const cx = rect.x + rx;
-  const cy = rect.y + rect.h - ry; // ellipse bottom touches the object's bottom
-  const y0 = Math.max(0, Math.floor(cy - ry));
-  const y1 = Math.min(size - 1, Math.ceil(cy + ry));
-  const x0 = Math.max(0, Math.floor(cx - rx));
-  const x1 = Math.min(size - 1, Math.ceil(cx + rx));
+  const e = footprintEllipse(rect, footprint);
+  const y0 = Math.max(0, Math.floor(e.cy - e.ry));
+  const y1 = Math.min(size - 1, Math.ceil(e.cy + e.ry));
+  const x0 = Math.max(0, Math.floor(e.cx - e.rx));
+  const x1 = Math.min(size - 1, Math.ceil(e.cx + e.rx));
   for (let my = y0; my <= y1; my++) {
     for (let mx = x0; mx <= x1; mx++) {
-      const nx = (mx + 0.5 - cx) / rx, ny = (my + 0.5 - cy) / ry;
+      const nx = (mx + 0.5 - e.cx) / e.rx, ny = (my + 0.5 - e.cy) / e.ry;
       if (nx * nx + ny * ny <= 1) collision[my * size + mx] = 255;
     }
   }

@@ -1,0 +1,60 @@
+{
+  "image": "spritesheet.png",
+  "frameSize": 64,
+  "columns": 8,
+  "rows": 24,
+  "directions": [
+    "south",
+    "south-east",
+    "east",
+    "north-east",
+    "north",
+    "north-west",
+    "west",
+    "south-west"
+  ],
+  "actions": {
+    "idle": {
+      "frameCount": 4,
+      "durationMs": 100,
+      "rowByDirection": {
+        "south": 0,
+        "south-east": 3,
+        "east": 6,
+        "north-east": 9,
+        "north": 12,
+        "north-west": 15,
+        "west": 18,
+        "south-west": 21
+      }
+    },
+    "walk": {
+      "frameCount": 8,
+      "durationMs": 100,
+      "rowByDirection": {
+        "south": 1,
+        "south-east": 4,
+        "east": 7,
+        "north-east": 10,
+        "north": 13,
+        "north-west": 16,
+        "west": 19,
+        "south-west": 22
+      }
+    },
+    "attack": {
+      "frameCount": 6,
+      "durationMs": 100,
+      "rowByDirection": {
+        "south": 2,
+        "south-east": 5,
+        "east": 8,
+        "north-east": 11,
+        "north": 14,
+        "north-west": 17,
+        "west": 20,
+        "south-west": 23
+      }
+    }
+  }
+}
