@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Walk the Compiled Map</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 16px; background: #1d1d1f; color: #eee; }
+      #status { margin-bottom: 8px; font-size: 14px; }
+      #report { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 12px;
+                margin-top: 8px; max-height: 160px; overflow: auto; }
+      .ok { color: #7bd88f; } .bad { color: #ff6b6b; }
+      canvas { border: 1px solid #555; image-rendering: pixelated; }
+      .hint { opacity: 0.7; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <h1>Walk the Compiled Map</h1>
+    <div id="status">loading…</div>
+    <div class="hint">WASD / arrow keys to walk. Water, mountains, cliffs, forest, and buildings block; bridges and doors are walkable.</div>
+    <canvas id="game"></canvas>
+    <div id="report"></div>
+    <script type="module" src="/src/mapwalk.ts"></script>
+  </body>
+</html>
