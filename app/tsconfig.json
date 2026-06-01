@@ -8,5 +8,5 @@
     "skipLibCheck": true,
     "types": ["vite/client"]
   },
-  "include": ["src", "../src/core"]
+  "include": ["src", "../src/core", "../src/mapcompiler"]
 }
